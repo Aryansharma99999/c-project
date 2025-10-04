@@ -2,17 +2,16 @@
   "builds": [
     {
       "src": "api/c_runner.js",
-      "use": "@vercel/node@3"
+      "use": "@vercel/node@3",
+      "config": {
+        "maxLambdaSize": "10mb" 
+      }
     }
   ],
   "routes": [
     {
-      "src": "/fibonacci",
-      "dest": "/api/c_runner"
-    },
-    {
-      "src": "/fibonacci/(.*)",
-      "dest": "/api/c_runner"
+      "src": "/(.*)", 
+      "dest": "/api/c_runner.js" 
     }
   ]
 }
