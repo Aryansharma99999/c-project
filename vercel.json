@@ -1,0 +1,27 @@
+{
+  "functions": {
+    "api/c_runner.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
+  "builds": [
+    {
+      "src": "api/c_runner.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "fibonacci.c",
+      "use": "@vercel/static-file"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/fibonacci",
+      "dest": "/api/c_runner"
+    },
+    {
+      "src": "/fibonacci/(.*)",
+      "dest": "/api/c_runner"
+    }
+  ]
+}
