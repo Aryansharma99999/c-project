@@ -1,0 +1,10 @@
+{
+  "name": "c-vercel-runner",
+  "version": "1.0.0",
+  "description": "Runs a C executable via a Vercel Node.js serverless function.",
+  "scripts": {
+    "start": "node api/c_runner.js"
+  },
+  "dependencies": {},
+  "private": true
+}
