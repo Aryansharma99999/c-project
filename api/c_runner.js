@@ -30,8 +30,11 @@ module.exports = async (req, res) => {
             // If the executable doesn't exist, compile the C code
             console.log(`[C_RUNNER] Compiling ${SOURCE_PATH}...`);
             await new Promise((resolve, reject) => {
-                // Use the built-in GCC available on Vercel
-                exec(`gcc -o ${EXECUTABLE_PATH} ${SOURCE_PATH}`, (error, stdout, stderr) => {
+                // *** CRITICAL FIX: Use the explicit path for GCC ***
+                // This ensures the compiler is found even if the PATH environment variable is missing.
+                const compileCommand = `/usr/bin/gcc -o ${EXECUTABLE_PATH} ${SOURCE_PATH}`;
+
+                exec(compileCommand, (error, stdout, stderr) => {
                     if (error) {
                         // Crucial: Log compilation error for debugging
                         console.error(`[C_RUNNER] Compilation failed: ${stderr}`);
