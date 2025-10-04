@@ -1,68 +1,62 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
+#include <limits.h>
 
-/**
- * fibonacci - Calculates the Nth Fibonacci number using an iterative approach.
- * @n: The index of the Fibonacci number to find (e.g., n=7 gives 13).
- * Return: The Nth Fibonacci number as a long long (up to Fib(92)).
+/*
+ * Calculates the Nth Fibonacci number iteratively.
+ * This approach is used to avoid stack overflow errors common with simple recursion
+ * for large N, and is generally faster.
+ * * Note: Uses unsigned long long to handle larger numbers, but will overflow
+ * around N=93. For this example, it demonstrates computational efficiency.
  */
-long long fibonacci(int n) {
-    // Base cases
+unsigned long long calculate_fibonacci(int n) {
     if (n <= 0) return 0;
     if (n == 1) return 1;
 
-    // Iterative calculation for speed and efficiency
-    long long a = 0;
-    long long b = 1;
-    long long next;
+    unsigned long long a = 0;
+    unsigned long long b = 1;
+    unsigned long long temp;
 
     for (int i = 2; i <= n; i++) {
-        // Check for potential overflow (though long long handles up to 92)
-        if (b > (LLONG_MAX - a)) {
-             // In a real app, you'd handle this more gracefully, but here we just stop.
-             // This is mostly for demonstration, as 92 is the practical limit for 64-bit int.
+        // Check for potential overflow before calculation
+        if (a > ULLONG_MAX - b) {
+            // This is a simple way to indicate overflow, usually handled better
+            // in a real application, but sufficient for this demo.
+            return 0; 
         }
-        next = a + b;
+        temp = a + b;
         a = b;
-        b = next;
+        b = temp;
     }
     return b;
 }
 
-/**
- * main - Entry point for the C program.
- * Reads the input number N from the command line argument (argv[1]).
- * The Node.js wrapper calls this program like: ./fib_runner 40
- */
 int main(int argc, char *argv[]) {
-    // 1. Input Check: Ensure an argument was provided
-    if (argc < 2) {
-        // Outputting error to stdout is captured by the Node.js wrapper
-        fprintf(stdout, "Error: Missing input N. Usage: [EXECUTABLE] N\n");
-        return 1; // Exit with error code
-    }
-
-    // 2. Conversion and Validation
-    char *endptr;
-    // strtol safely converts string to long, handles errors
-    long input_n_long = strtol(argv[1], &endptr, 10);
-
-    // Validate if conversion was successful, number is positive, and within the safe range
-    if (errno == ERANGE || *endptr != '\0' || input_n_long < 0 || input_n_long > 92) {
-        fprintf(stdout, "Error: Invalid input. Please use an integer between 0 and 92.\n");
+    if (argc != 2) {
+        // The program requires exactly one argument (N)
+        fprintf(stderr, "Error: Missing input number (N).\n");
         return 1;
     }
 
-    // Cast the validated input to int
-    int n = (int)input_n_long;
+    // Read the input number N from the command-line argument
+    int n = atoi(argv[1]);
 
-    // 3. Calculation
-    long long result = fibonacci(n);
+    if (n < 0 || n > 92) {
+        // Limit N to prevent obvious overflow and to handle negative inputs
+        fprintf(stderr, "Error: Input N must be between 0 and 92.\n");
+        return 1;
+    }
 
-    // 4. Output: Print the result to stdout
-    // The Node.js wrapper (api/c_runner.js) will read this output.
-    printf("Fib(%d) is: %lld\n", n, result);
+    unsigned long long result = calculate_fibonacci(n);
 
-    return 0; // Exit successfully
+    if (result == 0 && n > 0) {
+        // Output error if overflow was detected in the function
+        fprintf(stderr, "Error: Result overflowed unsigned long long limit.\n");
+        return 1;
+    }
+
+    // Print the result to stdout, which the Node.js wrapper captures
+    printf("%llu\n", result);
+
+    return 0;
 }
