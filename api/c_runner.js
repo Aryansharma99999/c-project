@@ -30,17 +30,28 @@ module.exports = async (req, res) => {
             // If the executable doesn't exist, compile the C code
             console.log(`[C_RUNNER] Compiling ${SOURCE_PATH}...`);
             await new Promise((resolve, reject) => {
-                // *** CRITICAL FIX: Use the explicit path for GCC ***
-                // This ensures the compiler is found even if the PATH environment variable is missing.
+                // Use the explicit path for GCC
                 const compileCommand = `/usr/bin/gcc -o ${EXECUTABLE_PATH} ${SOURCE_PATH}`;
 
                 exec(compileCommand, (error, stdout, stderr) => {
                     if (error) {
-                        // Crucial: Log compilation error for debugging
                         console.error(`[C_RUNNER] Compilation failed: ${stderr}`);
                         return reject(new Error(`Compilation failed: ${stderr}`));
                     }
                     console.log('[C_RUNNER] Compilation successful.');
+                    resolve();
+                });
+            });
+            
+            // *** NEW CRITICAL STEP: Set execution permissions on the compiled binary ***
+            // This prevents a common "Permission denied" runtime error on Vercel.
+            await new Promise((resolve, reject) => {
+                exec(`chmod +x ${EXECUTABLE_PATH}`, (error) => {
+                    if (error) {
+                        console.error(`[C_RUNNER] Chmod failed: ${error.message}`);
+                        return reject(new Error(`Chmod failed: ${error.message}`));
+                    }
+                    console.log('[C_RUNNER] Execution permissions set.');
                     resolve();
                 });
             });
