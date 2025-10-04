@@ -1,79 +1,79 @@
 const { exec } = require('child_process');
-const { promises: fs } = require('fs');
 const path = require('path');
-const url = require('url');
+const { promises: fs } = require('fs');
 
-// --- Configuration Constants ---
-// Temporary directory where Vercel will compile the C executable
-const BUILD_DIR = '/tmp/c-build';
-const EXECUTABLE_NAME = 'fib_runner';
-const EXECUTABLE_PATH = path.join(BUILD_DIR, EXECUTABLE_NAME);
+// Define paths relative to the current working directory (__dirname is api folder)
+const SOURCE_PATH = path.join(__dirname, '..', 'fibonacci.c');
+const EXECUTABLE_PATH = path.join('/tmp', 'fib_program'); // Must use /tmp on Vercel
 
-// FIX: Use the Vercel-provided CWD (Current Working Directory) to reliably find the source file.
-// CWD is the project root in the build context.
-const ROOT_DIR = process.cwd(); 
-const SOURCE_PATH = path.join(ROOT_DIR, 'fibonacci.c');
-
-/**
- * Handles the serverless function request.
- * Endpoint will be accessed via: /fibonacci?n=40
- */
+// Wrapper function for the Vercel Serverless environment
 module.exports = async (req, res) => {
-    // 1. Get the parameter N from the URL query string
-    const query = url.parse(req.url, true).query;
-    const n = query.n || '40'; // Default to 40 if 'n' is missing
+    // 1. Get input N from URL query parameters
+    const n = req.query.n;
 
-    const requestedN = parseInt(n, 10);
-    // Input Validation: Ensure N is a safe integer for the 64-bit C program (0-92)
-    if (isNaN(requestedN) || requestedN < 0 || requestedN > 92) {
-        res.status(400).setHeader('Content-Type', 'text/plain').send('Invalid input: Please provide a valid integer N between 0 and 92.');
+    if (!n) {
+        res.status(400).send('Error: Missing query parameter "n" (e.g., /fibonacci?n=20)');
+        return;
+    }
+    
+    const N = parseInt(n);
+    if (isNaN(N) || N < 0 || N > 92) {
+        res.status(400).send('Error: Invalid input. "n" must be an integer between 0 and 92.');
         return;
     }
 
     try {
-        // --- Compilation Step (Required for the first run or cold start) ---
-        await fs.mkdir(BUILD_DIR, { recursive: true });
-
-        // Check if the compiled executable already exists in the temporary directory.
-        // If not, we run the GCC compiler.
+        // 2. Check if the C program needs compilation (only compile once per deployment)
         try {
-            await fs.access(EXECUTABLE_PATH, fs.constants.X_OK);
-            console.log("Executable already exists, skipping compilation.");
-        } catch {
-            console.log("Compiling C source code...");
-            // Execute the GCC compiler to create the binary in the temp directory
-            const compileCommand = `gcc -o ${EXECUTABLE_PATH} ${SOURCE_PATH}`;
+            await fs.access(EXECUTABLE_PATH);
+        } catch (e) {
+            // If the executable doesn't exist, compile the C code
+            console.log(`[C_RUNNER] Compiling ${SOURCE_PATH}...`);
             await new Promise((resolve, reject) => {
-                exec(compileCommand, (error, stdout, stderr) => {
+                // Use the built-in GCC available on Vercel
+                exec(`gcc -o ${EXECUTABLE_PATH} ${SOURCE_PATH}`, (error, stdout, stderr) => {
                     if (error) {
-                        // Crucial: Reject with stderr to see the actual GCC error
-                        return reject(new Error(`Compilation failed (GCC output): ${stderr.trim()}`));
+                        // Crucial: Log compilation error for debugging
+                        console.error(`[C_RUNNER] Compilation failed: ${stderr}`);
+                        return reject(new Error(`Compilation failed: ${stderr}`));
                     }
+                    console.log('[C_RUNNER] Compilation successful.');
                     resolve();
                 });
             });
-            console.log("Compilation successful.");
         }
 
-        // --- Execution Step (Runs on every request) ---
-        // Execute the compiled C program, passing the requested N as a command line argument
-        const executeCommand = `${EXECUTABLE_PATH} ${requestedN}`;
+        // 3. Execute the compiled C program with N as argument
+        console.log(`[C_RUNNER] Executing compiled program with N=${N}...`);
+        
         const output = await new Promise((resolve, reject) => {
-            exec(executeCommand, (error, stdout, stderr) => {
+            exec(`${EXECUTABLE_PATH} ${N}`, (error, stdout, stderr) => {
                 if (error) {
-                    // Capture and return any error output from the C program itself
-                    return reject(new Error(`C Program Execution Error: ${stdout || stderr}`));
+                    // Crucial: Log runtime error for debugging
+                    console.error(`[C_RUNNER] Runtime error: ${stderr}`);
+                    return reject(new Error(`C Program Runtime Error: ${stderr}`));
                 }
-                resolve(stdout); // stdout contains the result from the C program's printf
+                resolve(stdout.trim());
             });
         });
 
-        // 4. Send the output back to the user
-        res.status(200).setHeader('Content-Type', 'text/plain').send(output);
+        // 4. Return the result
+        res.status(200).json({
+            n: N,
+            result: output,
+            message: `The ${N}th Fibonacci number is ${output}.`
+        });
 
     } catch (error) {
-        // Handle deployment or wrapper script errors
-        console.error("Vercel C Runner Error:", error);
+        // 5. Handle any errors (compilation or execution failure)
+        console.error(`[C_RUNNER] Fatal Error: ${error.message}`);
+        res.status(500).json({
+            error: true,
+            message: "Failed to execute C program on the server.",
+            details: error.message 
+        });
+    }
+};
         // Include the detailed message to debug the issue
         res.status(500).send(`Deployment or Runtime Error: ${error.message}. Please check Vercel logs for compilation errors.`);
     }
