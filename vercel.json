@@ -3,10 +3,6 @@
     {
       "src": "api/c_runner.js",
       "use": "@vercel/node@3"
-    },
-    {
-      "src": "fibonacci.c",
-      "use": "@vercel/static-file"
     }
   ],
   "routes": [
