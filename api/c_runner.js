@@ -9,8 +9,10 @@ const BUILD_DIR = '/tmp/c-build';
 const EXECUTABLE_NAME = 'fib_runner';
 const EXECUTABLE_PATH = path.join(BUILD_DIR, EXECUTABLE_NAME);
 
-// The C source file is located in the root, one directory up from the 'api' folder
-const SOURCE_PATH = path.join(path.dirname(__dirname), 'fibonacci.c');
+// FIX: Use the Vercel-provided CWD (Current Working Directory) to reliably find the source file.
+// CWD is the project root in the build context.
+const ROOT_DIR = process.cwd(); 
+const SOURCE_PATH = path.join(ROOT_DIR, 'fibonacci.c');
 
 /**
  * Handles the serverless function request.
@@ -44,7 +46,8 @@ module.exports = async (req, res) => {
             await new Promise((resolve, reject) => {
                 exec(compileCommand, (error, stdout, stderr) => {
                     if (error) {
-                        return reject(new Error(`Compilation failed: ${stderr}`));
+                        // Crucial: Reject with stderr to see the actual GCC error
+                        return reject(new Error(`Compilation failed (GCC output): ${stderr.trim()}`));
                     }
                     resolve();
                 });
@@ -59,7 +62,7 @@ module.exports = async (req, res) => {
             exec(executeCommand, (error, stdout, stderr) => {
                 if (error) {
                     // Capture and return any error output from the C program itself
-                    return reject(new Error(`C Program Execution Error: ${stdout}`));
+                    return reject(new Error(`C Program Execution Error: ${stdout || stderr}`));
                 }
                 resolve(stdout); // stdout contains the result from the C program's printf
             });
@@ -71,6 +74,7 @@ module.exports = async (req, res) => {
     } catch (error) {
         // Handle deployment or wrapper script errors
         console.error("Vercel C Runner Error:", error);
-        res.status(500).send(`Deployment or Runtime Error: ${error.message}`);
+        // Include the detailed message to debug the issue
+        res.status(500).send(`Deployment or Runtime Error: ${error.message}. Please check Vercel logs for compilation errors.`);
     }
 };
