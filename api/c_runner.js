@@ -74,7 +74,3 @@ module.exports = async (req, res) => {
         });
     }
 };
-        // Include the detailed message to debug the issue
-        res.status(500).send(`Deployment or Runtime Error: ${error.message}. Please check Vercel logs for compilation errors.`);
-    }
-};
